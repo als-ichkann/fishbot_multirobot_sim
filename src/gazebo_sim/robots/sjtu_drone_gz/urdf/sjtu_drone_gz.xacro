@@ -1,0 +1,295 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="sjtu_drone_gz">
+  <xacro:arg name="config_file" default="$(find gazebo_sim)/robots/sjtu_drone_gz/config/sjtu_drone_gz.yaml"/>
+  <xacro:arg name="robot_namespace" default=""/>
+
+  <xacro:property name="robot_namespace" value="$(arg robot_namespace)"/>
+  <xacro:property name="config_file"    value="$(arg config_file)"/>
+  <xacro:property name="cfg"            value="${xacro.load_yaml(config_file)}"/>
+  <xacro:property name="robot_cfg"      value="${cfg['robot']}"/>
+  <xacro:property name="imu_cfg"        value="${cfg['imu']}"/>
+  <xacro:property name="lidar_cfg"      value="${cfg['lidar']}"/>
+
+  <xacro:property name="ns"           value="${robot_namespace}"/>
+  <xacro:property name="frame_prefix" value="${ns + '/' if ns != '' else ''}"/>
+  <xacro:property name="topic_prefix" value="${'/' + ns if ns != '' else ''}"/>
+
+  <xacro:property name="base_frame"  value="${robot_cfg['base_frame']}"/>
+  <xacro:property name="lidar_frame" value="${robot_cfg['lidar_frame']}"/>
+  <xacro:property name="imu_frame"   value="${robot_cfg['imu_frame']}"/>
+  <xacro:property name="odom_frame"  value="${robot_cfg['odom_frame']}"/>
+  <xacro:property name="base_frame_prefixed"  value="${frame_prefix + base_frame}"/>
+  <xacro:property name="lidar_frame_prefixed" value="${frame_prefix + lidar_frame}"/>
+  <xacro:property name="imu_frame_prefixed"   value="${frame_prefix + imu_frame}"/>
+  <xacro:property name="odom_frame_prefixed"  value="${frame_prefix + odom_frame}"/>
+
+  <xacro:property name="odom_topic"    value="${topic_prefix + '/' + robot_cfg['odom_pub']}"/>
+  <xacro:property name="lidar_topic"   value="${topic_prefix + '/' + robot_cfg['lidar_pub']}"/>
+  <xacro:property name="imu_topic"     value="${topic_prefix + '/' + robot_cfg['imu_pub']}"/>
+  <xacro:property name="cmd_vel_topic" value="${topic_prefix + '/cmd_vel'}"/>
+
+  <xacro:property name="laser_retro" value="${robot_cfg.get('laser_retro', 0.0)}"/>
+
+  <!-- ========== Base link (quadrotor body) ========== -->
+  <link name="${base_frame}">
+    <inertial>
+      <mass value="1.477"/>
+      <inertia ixx="0.1152" ixy="0" ixz="0" iyy="0.1152" iyz="0" izz="0.218"/>
+    </inertial>
+    <collision name="base_collision">
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.08" radius="0.15"/>
+      </geometry>
+    </collision>
+    <visual name="base_visual">
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file://$(find gazebo_sim)/robots/sjtu_drone_gz/meshes/quadrotor_4.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- ========== Rotor links (4 for multicopter) ========== -->
+  <xacro:property name="arm_length" value="0.2"/>
+  <xacro:macro name="rotor_link" params="name x y direction:=1">
+    <link name="${name}">
+      <inertial>
+        <mass value="0.01"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder length="0.01" radius="0.05"/>
+        </geometry>
+        <material name="grey">
+          <color rgba="0.5 0.5 0.5 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="revolute">
+      <parent link="${base_frame}"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} 0.04" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-1e16" upper="1e16" effort="10" velocity="1000"/>
+      <dynamics damping="0.01" friction="0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:rotor_link name="rotor_0" x="${arm_length*0.707}" y="${arm_length*0.707}" direction="1"/>
+  <xacro:rotor_link name="rotor_1" x="${arm_length*0.707}" y="${-arm_length*0.707}" direction="-1"/>
+  <xacro:rotor_link name="rotor_2" x="${-arm_length*0.707}" y="${-arm_length*0.707}" direction="1"/>
+  <xacro:rotor_link name="rotor_3" x="${-arm_length*0.707}" y="${arm_length*0.707}" direction="-1"/>
+
+  <!-- ========== Lidar link ========== -->
+  <link name="${lidar_frame}">
+    <visual>
+      <geometry>
+        <cylinder length="0.02" radius="0.02"/>
+      </geometry>
+      <material name="black"><color rgba="0.1 0.1 0.1 0.8"/></material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.02" radius="0.02"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="${base_frame}"/>
+    <child link="${lidar_frame}"/>
+    <origin xyz="0 0 0.12" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========== IMU link ========== -->
+  <link name="${imu_frame}">
+    <visual>
+      <geometry><box size="0.02 0.02 0.02"/></geometry>
+    </visual>
+    <collision>
+      <geometry><box size="0.02 0.02 0.02"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="${base_frame}"/>
+    <child link="${imu_frame}"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========== Multicopter Motor Model (each rotor) ========== -->
+  <gazebo>
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>${ns}</robotNamespace>
+      <jointName>rotor_0_joint</jointName>
+      <linkName>rotor_0</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>800.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+      <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>${ns}</robotNamespace>
+      <jointName>rotor_1_joint</jointName>
+      <linkName>rotor_1</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>800.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+      <motorNumber>1</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>${ns}</robotNamespace>
+      <jointName>rotor_2_joint</jointName>
+      <linkName>rotor_2</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>800.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+      <motorNumber>2</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>${ns}</robotNamespace>
+      <jointName>rotor_3_joint</jointName>
+      <linkName>rotor_3</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>800.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+      <motorNumber>3</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+  </gazebo>
+
+  <!-- ========== Multicopter Velocity Control ========== -->
+  <gazebo>
+    <plugin filename="ignition-gazebo-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">
+      <robotNamespace>${ns}</robotNamespace>
+      <commandSubTopic>cmd_vel</commandSubTopic>
+      <enableSubTopic>enable</enableSubTopic>
+      <comLinkName>${base_frame}</comLinkName>
+      <velocityGain>2.7 2.7 2.7</velocityGain>
+      <attitudeGain>2 3 0.15</attitudeGain>
+      <angularRateGain>0.4 0.52 0.18</angularRateGain>
+      <maximumLinearAcceleration>2 2 2</maximumLinearAcceleration>
+      <rotorConfiguration>
+        <rotor><jointName>rotor_0_joint</jointName><forceConstant>8.54858e-06</forceConstant><momentConstant>0.016</momentConstant><direction>1</direction></rotor>
+        <rotor><jointName>rotor_1_joint</jointName><forceConstant>8.54858e-06</forceConstant><momentConstant>0.016</momentConstant><direction>-1</direction></rotor>
+        <rotor><jointName>rotor_2_joint</jointName><forceConstant>8.54858e-06</forceConstant><momentConstant>0.016</momentConstant><direction>1</direction></rotor>
+        <rotor><jointName>rotor_3_joint</jointName><forceConstant>8.54858e-06</forceConstant><momentConstant>0.016</momentConstant><direction>-1</direction></rotor>
+      </rotorConfiguration>
+    </plugin>
+  </gazebo>
+
+  <!-- Laser retro -->
+  <gazebo reference="${base_frame}">
+    <visual><laser_retro>${laser_retro}</laser_retro></visual>
+  </gazebo>
+  <gazebo reference="${lidar_frame}">
+    <visual><laser_retro>${laser_retro}</laser_retro></visual>
+  </gazebo>
+
+  <!-- ========== IMU sensor ========== -->
+  <gazebo reference="${imu_frame}">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>true</always_on>
+      <update_rate>${imu_cfg['update_rate']}</update_rate>
+      <visualize>${'true' if imu_cfg['visualize'] else 'false'}</visualize>
+      <topic>${imu_topic}</topic>
+      <gz_frame_id>${imu_frame_prefixed}</gz_frame_id>
+      <enable_metrics>true</enable_metrics>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['ang_stddev']}</stddev><bias_mean>${imu_cfg['noise']['ang_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['ang_bias_stddev']}</bias_stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['ang_stddev']}</stddev><bias_mean>${imu_cfg['noise']['ang_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['ang_bias_stddev']}</bias_stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['ang_stddev']}</stddev><bias_mean>${imu_cfg['noise']['ang_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['ang_bias_stddev']}</bias_stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['lin_stddev']}</stddev><bias_mean>${imu_cfg['noise']['lin_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['lin_bias_stddev']}</bias_stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['lin_stddev']}</stddev><bias_mean>${imu_cfg['noise']['lin_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['lin_bias_stddev']}</bias_stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>${imu_cfg['noise']['lin_stddev']}</stddev><bias_mean>${imu_cfg['noise']['lin_bias_mean']}</bias_mean><bias_stddev>${imu_cfg['noise']['lin_bias_stddev']}</bias_stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <!-- ========== Lidar sensor ========== -->
+  <gazebo reference="${lidar_frame}">
+    <sensor name="lidar_sensor" type="gpu_lidar">
+      <always_on>true</always_on>
+      <visualize>${'true' if lidar_cfg['visualize'] else 'false'}</visualize>
+      <update_rate>${lidar_cfg['update_rate']}</update_rate>
+      <topic>${lidar_topic}</topic>
+      <gz_frame_id>${lidar_frame_prefixed}</gz_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>${lidar_cfg['h_rays']['samples']}</samples>
+            <resolution>${lidar_cfg['h_rays']['resolution']}</resolution>
+            <min_angle>${lidar_cfg['h_rays']['min_angle']}</min_angle>
+            <max_angle>${lidar_cfg['h_rays']['max_angle']}</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>${lidar_cfg['v_rays']['samples']}</samples>
+            <resolution>${lidar_cfg['v_rays']['resolution']}</resolution>
+            <min_angle>${lidar_cfg['v_rays']['min_angle']}</min_angle>
+            <max_angle>${lidar_cfg['v_rays']['max_angle']}</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>${lidar_cfg['range_min']}</min>
+          <max>${lidar_cfg['range_max']}</max>
+          <resolution>${lidar_cfg['range_res']}</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>${lidar_cfg['noise_stddev']}</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+</robot>

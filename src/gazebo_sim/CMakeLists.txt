@@ -11,7 +11,8 @@ install(FILES package.xml
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS scripts/gt_ground_truth_odom.py
+install(PROGRAMS
+  scripts/gt_ground_truth_odom.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

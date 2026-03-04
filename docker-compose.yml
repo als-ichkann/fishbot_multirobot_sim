@@ -35,7 +35,7 @@ services:
       bash -lc "ros2 launch gazebo_sim quick.launch.py world:=fishbot2.world pattern:=grid spacing:=2 x:=-3 count:=${FISHBOT_AGENT_COUNT:-4}"
 
   # navigation:
-  #   container_name: fishbot_navigation
+  #   container_name: rover3d_navigation
   #   build:
   #     context: .
   #     dockerfile: docker/Dockerfile.navigation
@@ -50,9 +50,9 @@ services:
   #   environment:
   #     - FISHBOT_NAV_ROBOTS=${FISHBOT_NAV_ROBOTS:-bot1}
   #   volumes:
-  #     - ./src/navigation/:/fishbot_ws/src/navigation/
+  #     - ./src/rover3d_navigation/:/fishbot_ws/src/rover3d_navigation/
   #   command: >
-  #     bash -lc "ros2 launch fishbot_navigation navigation.launch.py robots:=${FISHBOT_NAV_ROBOTS:-bot1}"
+  #     bash -lc "ros2 launch rover3d_navigation navigation.launch.py robots:=${FISHBOT_NAV_ROBOTS:-bot1}"
 
   foxglove:
     container_name: fishbot_foxglove

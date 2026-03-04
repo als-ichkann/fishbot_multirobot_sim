@@ -12,7 +12,7 @@ def generate_launch_description() -> LaunchDescription:
     pkg_share = get_package_share_directory('gazebo_sim')
 
     declare_args = [
-        DeclareLaunchArgument('robot', default_value='fishbot_v2_3d', description='Robot blueprint folder name.'),
+        DeclareLaunchArgument('robot', default_value='sjtu_drone_gz', description='Robot blueprint folder name.'),
         DeclareLaunchArgument('world_name', default_value='default', description='Gazebo world name to target.'),
         DeclareLaunchArgument('count', default_value='3', description='Number of robots to spawn.'),
         DeclareLaunchArgument('name_prefix', default_value='bot', description='Prefix for spawned robot names.'),
@@ -118,17 +118,21 @@ def generate_launch_description() -> LaunchDescription:
                 ],
             )
 
+            bridge_args = [
+                f'/{name}/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
+                f'/{name}/imu@sensor_msgs/msg/Imu[gz.msgs.IMU',
+                f'/{name}/lidar_points/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+            ]
+            if robot != 'sjtu_drone_gz':
+                bridge_args.insert(1, f'/{name}/wheel_odom@nav_msgs/msg/Odometry[gz.msgs.Odometry')
+            else:
+                bridge_args.append(f'/{name}/enable@std_msgs/msg/Bool]gz.msgs.Boolean')
             bridge_node = Node(
                 package='ros_gz_bridge',
                 executable='parameter_bridge',
                 name=f'{name}_bridge',
                 output='screen',
-                arguments=[
-                    f'/{name}/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
-                    f'/{name}/wheel_odom@nav_msgs/msg/Odometry[gz.msgs.Odometry',
-                    f'/{name}/imu@sensor_msgs/msg/Imu[gz.msgs.IMU',
-                    f'/{name}/lidar_points/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
-                ],
+                arguments=bridge_args,
             )
 
             actions.append(
@@ -139,6 +143,8 @@ def generate_launch_description() -> LaunchDescription:
             )
 
         robot_ids = list(range(start_index, start_index + count))
+        # 使用 "world" 作为 odom 参考帧（与 TF/RViz 约定一致）；Gazebo 内部 world 名为 "default"
+        odom_world_frame = 'world' if world_name == 'default' else world_name
         if robot_ids:
             helper_nodes.append(
                 Node(
@@ -151,13 +157,12 @@ def generate_launch_description() -> LaunchDescription:
                         'robot_ids': robot_ids,
                         'robot_prefix': name_prefix,
                         'base_frame': 'base_link',
-                        'world_frame': world_name,
+                        'world_frame': odom_world_frame,
                         'odom_suffix': '/gt/odom',
                         'tf_topic': f'/world/{world_name}/pose/info',
                     }],
                 )
             )
-
         return actions + helper_nodes
 
     ld = LaunchDescription()

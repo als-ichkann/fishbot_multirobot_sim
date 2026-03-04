@@ -1,0 +1,39 @@
+robot:
+  base_name: sjtu_drone_gz
+  laser_retro: 5000.0
+  base_frame: base_link
+  lidar_frame: lidar_link
+  imu_frame: imu_link
+  odom_frame: odom
+  odom_pub: wheel_odom
+  lidar_pub: lidar_points
+  imu_pub: imu
+
+imu:
+  update_rate: 100
+  visualize: false
+  noise:
+    ang_stddev: 2e-4
+    ang_bias_mean: 7.5e-6
+    ang_bias_stddev: 8e-7
+    lin_stddev: 1.7e-2
+    lin_bias_mean: 0.1
+    lin_bias_stddev: 0.001
+
+lidar:
+  update_rate: 10
+  visualize: false
+  h_rays:
+    samples: 180
+    min_angle: -3.14159
+    max_angle: 3.14159
+    resolution: 0.2
+  v_rays:
+    samples: 64
+    min_angle: -0.4
+    max_angle: 0.3
+    resolution: 0.2
+  range_min: 0.12
+  range_max: 30.0
+  range_res: 0.01
+  noise_stddev: 0.01

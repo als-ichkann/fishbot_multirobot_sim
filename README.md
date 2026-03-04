@@ -11,7 +11,7 @@ Multi-robot simulation stack for testing lidar-inertial SLAM, map fusion, and na
 - Map fusion (`src/map_fusion`) that merges per-robot point clouds into `/global_downsampled_map` and republishes global poses.
 - ESDF map (`src/esdf_map`) that builds a 3D ESDF from either fused or per-robot clouds and exposes grid topics plus a distance/gradient query service.
 - Foxglove wrapper (`src/foxglove_app`) for multi-agent visualization layouts.
-- Navigation controller (`src/navigation`). Not integrated yet.
+- Navigation controller (`src/rover3d_navigation`). Not integrated yet.
 - Exploration module: ***TODO***
 
 ## How the pieces fit together
@@ -42,13 +42,15 @@ Multi-robot simulation stack for testing lidar-inertial SLAM, map fusion, and na
   - `Swarm-LIO2-ROS2-Docker/` – upstream SLAM port (includes its own compose file).
   - `map_fusion/` – map fusion nodes.
   - `esdf_map/` – ESDF builder node, launch, and config.
-  - `navigation/` – navigation package.
+  - `rover3d_navigation/` – navigation package.
   - `foxglove_app/` – Foxglove bridge wrapper, layouts, and optional extension.
 
 ## Prerequisites
 
 - **Docker** + **docker compose v2**.
 - NVIDIA GPU with drivers + `nvidia-container-toolkit` (Gazebo, Swarm-LIO2, and map fusion use `runtime: nvidia`/`gpus: all`).
+
+**Python 本地开发**：若运行 navigation/mpc_control 时出现 `numpy.dtype size changed`，执行 `pip install -r requirements.txt` 修复 NumPy/SciPy 版本兼容。
 
 ## Clone the repo (with submodules)
 
@@ -156,6 +158,10 @@ Note: wait about 10 seconds to IMU initialization for SLAM, before moving.
     ```
 
 - **Step 3:** move the agent around the others until all are detected (green/yellow cluster). Use RViz for easier visualization.
+
+## 使用指南
+
+详细的使用说明（环境配置、Docker 启动、SLAM 初始化、Navigation、Planning APF 等）见 [使用指南.md](使用指南.md)。
 
 ## TODOs
 

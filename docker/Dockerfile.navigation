@@ -5,15 +5,21 @@ SHELL ["/bin/bash", "-c"]
 
 WORKDIR /fishbot_ws
 
-COPY src/navigation/package.xml src/navigation/
+COPY src/rover3d_navigation/package.xml src/rover3d_navigation/
 RUN rosdep update \
-    && rosdep install --rosdistro humble --from-paths src/navigation --ignore-src -y
+    && rosdep install --rosdistro humble --from-paths src/rover3d_navigation --ignore-src -y
 
-COPY src/navigation/ src/navigation/
+# 固定 numpy/scipy 版本，避免 NumPy 2.x 与 SciPy 二进制不兼容
+COPY requirements.txt /
+RUN apt-get update && apt-get install -y python3-pip \
+    && pip3 install --no-cache-dir "numpy>=1.21,<2.0" "scipy>=1.8" \
+    && apt-get clean
+
+COPY src/rover3d_navigation/ src/rover3d_navigation/
 
 RUN source /opt/ros/humble/setup.bash \
     && colcon build --merge-install --symlink-install \
-        --packages-select fishbot_navigation
+        --packages-select rover3d_navigation
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

@@ -23,7 +23,7 @@ def _configure_nodes(context, *args, **kwargs):
     for name in robot_names:
         nodes.append(
             Node(
-                package='fishbot_navigation',
+                package='rover3d_navigation',
                 executable='navigator.py',
                 namespace=name,
                 name='navigator',
@@ -40,7 +40,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'config_file',
             default_value=PathJoinSubstitution([
-                FindPackageShare('fishbot_navigation'),
+                FindPackageShare('rover3d_navigation'),
                 'config',
                 'navigation.yaml',
             ]),
